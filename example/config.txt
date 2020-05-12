@@ -1,0 +1,2 @@
+Prefix plugins/TimeWarp/example/
+Plugin TimeWarp inputfile parameters.txt outputfile time_warp_results.csv
