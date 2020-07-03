@@ -2,7 +2,8 @@
 # Language: R
 # Input: TXT (parameters)
 # Output: CSV (optimal parameters)
-# Tested with: PluMA 1.0, R 3.2.5
+# Tested with: PluMA 1.1, R 4.0.0
+# Dependency: caret_6.0.86, spls_2.2.3
 
 PluMA plugin that takes a set of time series data samples
 and performs time-warping, which aligns each sample to follow
