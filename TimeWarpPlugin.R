@@ -12,6 +12,13 @@ input <- function(inputfile) {
   t2 <<- read.table(toString(parameters["clinical",2]), sep="\t", header = TRUE,  stringsAsFactors=FALSE)
   print("DONE");
   prefix <<- toString(parameters["prefix", 2]);
+  joinby <<- toString(parameters["joinby", 2])
+  orderby <<- toString(parameters["orderby", 2])
+  id <<- toString(parameters["id", 2])
+  classcol <<- toString(parameters["classcol", 2]) 
+  traincontrolmethod <<- toString(parameters["trainControl", 2]) 
+  trainmethod <<- toString(parameters["train", 2]) 
+  myX <<- toString(parameters["x", 2])
 }
 
 run <- function() {
@@ -20,41 +27,37 @@ run <- function() {
 #t1 <- read.table("ViralChallenge_training_EXPRESSION_RMA.tsv", sep = "\t", header =FALSE, stringsAsFactors=FALSE)
 #t2 <- read.table("ViralChallenge_training_CLINICAL.tsv", sep="\t", header = TRUE,  stringsAsFactors=FALSE)
 
-t2[t2$STUDYID == "DEE4X H1N1",]="H1N1"
-t2[t2$STUDYID == "DEE3 H1N1",]="H1N1"
-t2[t2$STUDYID == "DEE2 H3N2",]="H3N2"
-t2[t2$STUDYID == "DEE5 H3N2",]="H3N2"
-t2[t2$STUDYID == "Rhinovirus Duke",]="Rhinovirus"
-t2[t2$STUDYID == "Rhinovirus UVA",]="Rhinovirus"
-
 t1 <<- as.data.frame(t(t1), stringsAsFactors=FALSE)
-colnames(t1)[1] <<- "CEL"
+colnames(t1)[1] <<- joinby
 # rownames(t1) <- substring(rownames(t1), 2, length(rownames(t1)))
 # write.table(t1, file = "shortRMA.csv", sep = ",", row.names = FALSE, col.names = TRUE)
-x <<- as.data.frame(merge(t1, t2, by ="CEL", stringsAsFactors=FALSE))
+x <<- as.data.frame(merge(t1, t2, by =joinby, stringsAsFactors=FALSE))
+studyID <<- unique(as.character(unlist(x[id])))
+   train_set_size <<- ncol(t1)
+   class_index <<- grep(classcol, colnames(t2))
 
-studyID <<- unique(x$STUDYID)
+
+#studyID <<- unique(x$STUDYID)
 }
 
 output <- function(outputfile) {
 for(virus in studyID){
-  v1 <- x[x[,"STUDYID"]==virus,]
+  v1 <- x[x[,id]==virus,]
   maxAc = 0
   for(k in c(2,3,4)){
-    #P = read.csv(paste("cluster_",virus,"_","k",k,".csv", sep=""),sep = ",",header=TRUE, row.names = 1, stringsAsFactors=FALSE)
     P = read.csv(paste(prefix,virus,"_","k",k,".csv", sep=""),sep = ",",header=TRUE, row.names = 1, stringsAsFactors=FALSE)
     avgAc = 0
     for(i in k){
       lis = P[i,!is.na(P[i,])]
-      grp = v1[v1$SUBJECTID %in% lis,]
-      times = unique(grp$TIMEHOURS)
+      grp = v1[as.character(unlist(v1[orderby])) %in% lis,]
+      times = unique(as.character(unlist(grp[myX])))
       grpAc = 0
-      if(min(grp$SYMPTOMATIC_SC2)!= max(grp$SYMPTOMATIC_SC2))
+      if(min(as.integer(unlist(grp[classcol]))) != max(as.integer(unlist(grp[classcol]))))
       {
         for(t in times)
         {
-          X = data.matrix(grp[grp$TIMEHOURS==t,2:22278])
-          Y = as.factor(grp[grp$TIMEHOURS==t,22286])
+          X = data.matrix(grp[as.double(unlist(grp[myX]))==t,2:train_set_size])
+          Y = as.factor(grp[as.double(unlist(grp[myX]))==t,(train_set_size+class_index)])
           my_pls1 = plsda(X, Y, ncomp = 2)
           res = order(varImp(my_pls1), decreasing = TRUE)[1:50]
           
@@ -62,8 +65,8 @@ for(virus in studyID){
           rf.label = Y
           
           cv.folds <- createMultiFolds(rf.label, k=10, times = 10)
-          fit  = trainControl(method = "repeatedcv", number = 10, repeats = 10, index = cv.folds)
-          res = train(x = datX, y = rf.label, method = "rf", tuneLength = 3, ntree = 1000, trControl = fit)
+          fit  = trainControl(method = traincontrolmethod, number = 10, repeats = 10, index = cv.folds)
+          res = train(x = datX, y = rf.label, method = trainmethod, tuneLength = 3, ntree = 1000, trControl = fit)
           
           # df = data.frame(max(res$results$Accuracy), t, virus)
           write.csv(lis, file = outputfile, row.names = FALSE)
